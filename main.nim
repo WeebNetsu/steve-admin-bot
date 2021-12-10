@@ -1,5 +1,6 @@
-import options, telebot, asyncdispatch, strformat, json
-import strutils
+import options, telebot, asyncdispatch, strformat, json, strutils
+
+import aux
 
 const secret = slurp("secret.json")
 
@@ -18,10 +19,9 @@ proc helpMenu(bot: Telebot, message: Message): Future[void] {.async.} =
 
 proc muteMember(bot: Telebot, message: Message, mute: bool = true): Future[void] {.async.} =
     try:
-        let u = message.replyToMessage
+        let u: Option[User] = getTaggedUserByMessage(message)
         if issome(u):
-            let user = get(get(u).fromUser)
-            
+            let user: User = get(u)
             let q = ChatPermissions(
                 canSendMessages: option[bool](not mute),
                 canSendMediaMessages: option[bool](not mute),
@@ -83,6 +83,48 @@ proc muteMember(bot: Telebot, message: Message, mute: bool = true): Future[void]
             "Unpack Defect bro, that option does not exist"
         )
 
+proc makeAdmin(bot: Telebot, message: Message, giveRole: bool = true): Future[void] {.async.} =
+    let u: Option[User] = getTaggedUserByMessage(message)
+    if issome(u):
+        let user: User = get(u)
+        discard await bot.promoteChatMember($message.chat.id, user.id)
+        discard await bot.sendMessage(
+            message.chat.id,
+            &"@{get(user.username)} has been promoted to admin! Be pround you sun of a gun!"
+        )
+    else:
+        discard await bot.sendMessage(
+            message.chat.id,
+            "Who am I supposed to promote??? Tag someone buddy."
+        )
+    #[ 
+    chat_id
+    user_id
+    is_anonymous - 
+        Pass True, if the administrator's presence in the chat is hidden
+    can_manage_chat - 
+        Pass True, if the administrator can access the chat event log, chat statistics, message statistics in channels, see channel members, see anonymous administrators in supergroups and ignore slow mode. Implied by any other administrator privilege
+    can_post_messages - 
+        Pass True, if the administrator can create channel posts, channels only
+    can_edit_messages - 
+        Pass True, if the administrator can edit messages of other users and can pin messages, channels only
+    can_delete_messages - 
+        Pass True, if the administrator can delete messages of other users
+    can_manage_voice_chats - 
+        Pass True, if the administrator can manage voice chats
+    can_restrict_members - 
+        Pass True, if the administrator can restrict, ban or unban chat members
+    can_promote_members - 
+        Pass True, if the administrator can add new administrators with a subset of their own privileges or demote administrators that he has promoted, directly or indirectly (promoted by administrators that were appointed by him)
+    can_change_info - 
+        Pass True, if the administrator can change chat title, photo and other settings
+    can_invite_users - 
+        Pass True, if the administrator can invite new users to the chat
+    can_pin_messages - 
+        Pass True, if the administrator can pin messages, supergroups only
+ ]#
+
+
 # --------------------------- BOT ---------------------------
 proc main(bot: Telebot, u: Update): Future[bool] {.async, gcsafe.} =
     if not u.message.isSome: # return true will make bot stop process other callbacks
@@ -95,6 +137,8 @@ proc main(bot: Telebot, u: Update): Future[bool] {.async, gcsafe.} =
             BotCommand(command: "/help", description: "Get help"),
             BotCommand(command: "/mute", description: "Mute Member"),
             BotCommand(command: "/unmute", description: "Unmute Member"),
+            BotCommand(command: "/makeadmin", description: "Give user Admin role"),
+            BotCommand(command: "/removeadmin", description: "Remove user Admin role"),
         ])
 
         if message.text.isSome:
@@ -103,8 +147,10 @@ proc main(bot: Telebot, u: Update): Future[bool] {.async, gcsafe.} =
                 await helpMenu(bot, message)
             elif text.startsWith("/mute"):
                 await muteMember(bot, message)
-            elif text.startsWith("/unmute"):
-                await muteMember(bot, message, false)
+            elif text.startsWith("/makeadmin"):
+                await makeAdmin(bot, message, false)
+            # elif text.startsWith("/removeadmin"):
+                # await makeAdmin(bot, message, true)
     except:
         discard await bot.sendMessage(
             message.chat.id,
