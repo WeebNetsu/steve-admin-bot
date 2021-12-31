@@ -87,7 +87,7 @@ proc makeAdmin*(bot: Telebot, message: Message, giveRole: bool = true): Future[v
 
                 discard await bot.sendMessage(
                     message.chat.id,
-                    &"@{get(user.username)} has been promoted to admin! Be pround you sun of a gun!"
+                    &"@{get(user.username)} has been promoted to admin! Be pround you son of a gun!"
                 )
             else:
                 # all parameters are false by default

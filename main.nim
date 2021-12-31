@@ -1,8 +1,12 @@
+# todo: muting and unmuting admins causes them to lose admin privilages
+# todo: Admins can mute other admins
+# todo: you can make an already existing admin an admin
+
 import options, telebot, asyncdispatch, strutils
 
 # my stuff
 import src/commands
-from src/auxillary import getSecretJson, checkAdmin, checkSameUser
+from src/auxillary import getSecretJson, checkAdmin, checkSameUser, checkIsBot
 
 proc main(bot: Telebot, u: Update): Future[bool] {.async, gcsafe.} =
     if not isSome(u.message): # return true will make bot stop process other callbacks
@@ -16,38 +20,47 @@ proc main(bot: Telebot, u: Update): Future[bool] {.async, gcsafe.} =
             BotCommand(command: "/mute", description: "Mute Member"),
             BotCommand(command: "/unmute", description: "Unmute Member"),
             BotCommand(command: "/makeadmin", description: "Give user Admin role"),
-            BotCommand(command: "/removeadmin", description: "Remove user Admin role"),
+            # BotCommand(command: "/removeadmin", description: "Remove user Admin role"),
+            BotCommand(command: "/ping", description: "Ping me to check if I'm online"),
         ])
 
-        let isAdmin: bool = await checkAdmin(bot, message)
-        if message.text.isSome and isAdmin:
-            let text = message.text.get
+        let 
+            isBot: bool = await checkIsBot(bot, message)
+            isAdmin: bool = await checkAdmin(bot, message)
+            sameUser: bool = await checkSameUser(bot, message)
+
+        if isSome(message.text):
+            let 
+                text = get(message.text)
+                isAllowed: bool = isAdmin and not (sameUser or isBot)
+
+            var called = true
+
             if text.startsWith("/help"):
-                if not await checkSameUser(bot, message):
+                if isAllowed:
                     await helpMenu(bot, message)
+            elif text.startsWith("/ping"):
+                if isAllowed:
+                    discard await bot.sendMessage(message.chat.id, "Heyo! I am online!")
             elif text.startsWith("/mute"):
-                if not await checkSameUser(bot, message):
+                if isAllowed:
                     await muteMember(bot, message)
             elif text.startsWith("/unmute"):
-                if not await checkSameUser(bot, message):
+                if isAllowed:
                     await muteMember(bot, message, false)
             elif text.startsWith("/makeadmin"):
-                if not await checkSameUser(bot, message):
+                if isAllowed:
                     await makeAdmin(bot, message)
-                # todo: only the channel creator should be able to use this
-                # the property exists on the ChatMember object type
-                # check checkAdmin()
-            elif text.startsWith("/removeadmin"):
-                # todo: only the channel creator should be able to use this
-                # the property exists on the ChatMember object type
-                # check checkAdmin()
-                if not await checkSameUser(bot, message):
-                    await makeAdmin(bot, message, false)
-        else:
-            discard await bot.sendMessage(
-                message.chat.id,
-                "You are not admin!"
-            )
+            else:
+                called = false
+
+            if called:
+                if not isAdmin:
+                    discard await bot.sendMessage(message.chat.id, "You are not Admin! Now begone!")
+                elif sameUser:
+                    discard await bot.sendMessage(message.chat.id, "You shouldn't be playing with your own permissions...")
+                elif isBot:
+                    discard await bot.sendMessage(message.chat.id, "I am not allowed to mess with bots... Sowwy senpai!")
     except:
         discard await bot.sendMessage(
             message.chat.id,
@@ -59,6 +72,13 @@ let bot = newTeleBot(getSecretJson("api_key", secret))
 bot.onUpdate(main)
 bot.poll()
 
+#[ # I removed this because it can be too dangerous to keep around
+elif text.startsWith("/removeadmin"):
+    # todo?: only the channel creator should be able to use this
+    # the property exists on the ChatMember object type
+    # check checkAdmin()
+    if not await checkSameUser(bot, message):
+        await makeAdmin(bot, message, false) ]#
 
 #[ (
     messageId: 6

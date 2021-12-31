@@ -13,9 +13,10 @@ proc getSecretJson*(key: string, secret: string): string =
     return jsonSecret[key].getStr()
 
 proc checkAdmin*(bot: Telebot, message: Message): Future[bool] {.async.} =
-    let admins: seq[ChatMember] = await bot.getChatAdministrators($message.chat.id)
+    let 
+        admins: seq[ChatMember] = await bot.getChatAdministrators($message.chat.id)
+        messageOwner = message.fromUser
 
-    let messageOwner = message.fromUser
     if isSome(messageOwner):
         for admin in admins:
             if (get(messageOwner).id == admin.user.id) and (not admin.user.isBot):
@@ -25,13 +26,17 @@ proc checkAdmin*(bot: Telebot, message: Message): Future[bool] {.async.} =
 
 proc checkSameUser*(bot: Telebot, message: Message): Future[bool] {. async .} =
     result = false
-    let messageOwner = message.fromUser
-    let taggedMessageUser = getTaggedUserByMessage(message)
+    let 
+        messageOwner: Option[User] = message.fromUser
+        taggedMessageUser: Option[User] = getTaggedUserByMessage(message)
 
     if isSome(messageOwner) and isSome(taggedMessageUser):
         if get(messageOwner).id == get(taggedMessageUser).id:
-            discard await bot.sendMessage(
-                message.chat.id,
-                "You shouldn't be playing with your own permissions..."
-            )
             result = true
+
+proc checkIsBot*(bot: Telebot, message: Message): Future[bool] {. async .} =
+    result = false
+    let taggedMessageUser: Option[User] = getTaggedUserByMessage(message)
+
+    if isSome(taggedMessageUser):
+        result = get(taggedMessageUser).isBot
